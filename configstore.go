@@ -1,6 +1,4 @@
-package main
-
-// package configstore
+package configstore
 
 import (
 	"bytes"
