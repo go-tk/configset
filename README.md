@@ -1,6 +1,6 @@
 # configstore
 
-Tiny configuration management library
+Simplistic configuration library
 
 ## Example
 
