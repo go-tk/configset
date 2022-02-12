@@ -1,5 +1,9 @@
 # configstore
 
+[![GoDev](https://pkg.go.dev/badge/golang.org/x/pkgsite.svg)](https://pkg.go.dev/github.com/go-tk/configstore)
+[![Workflow Status](https://github.com/go-tk/configstore/actions/workflows/main.yaml/badge.svg?branch=main)](https://github.com/go-tk/configstore/actions)
+[![Coverage Status](https://codecov.io/gh/go-tk/configstore/branch/main/graph/badge.svg)](https://codecov.io/gh/go-tk/configstore)
+
 Simplistic configuration library
 
 ## Example
