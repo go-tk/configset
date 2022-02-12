@@ -26,7 +26,7 @@ secrets:
     - 5
 `), 0644)
 
-	// 2. Override configuration items via environment variables.
+	// 2. Override configuration values via environment variables.
 	os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value should be valid YAML
 	os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
@@ -38,7 +38,7 @@ secrets:
 	fmt.Println("===== Dump =====")
 	fmt.Println(json)
 
-	// 5. Load a configuration item into a struct.
+	// 5. Load a configuration item by a path.
 	var secrets struct {
 		Password    string `json:"password"`     // should use json tag rather than yaml tag
 		LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
