@@ -21,7 +21,7 @@ var cs *configStore
 // All *.yaml files under the given directory will be read in and cached in
 // memory in form of JSON.
 // If there are environment variables set such as CONFIGSTORE.{path}={value},
-// the cached JSON will be overwritten according to paths and values.
+// the cache will be overwritten according to paths and values.
 func Open(dirPath string) error {
 	fs := afero.NewOsFs()
 	environment := os.Environ()
@@ -43,9 +43,9 @@ func MustOpen(dirPath string) {
 // Dump returns the JSON that represents the content of the *.yaml files read in.
 func Dump() string { return cs.Dump() }
 
-// LoadItem finds the JSON value for the given path from the config store and
-// unmarshals the given item from that JSON value.
-// If no JSON value can be found by the path, ErrJSONValueNotFound is returned.
+// LoadItem finds the JSON value for the given path from the cache and unmarshals
+// the given item from that JSON value.
+// If no JSON value can be found by the path, ErrValueNotFound is returned.
 func LoadItem(path string, item interface{}) error { return cs.LoadItem(path, item) }
 
 // MustLoadItem likes LoadItem but panics when an error occurs.
@@ -103,12 +103,11 @@ func patchConfigs(rawConfigs json.RawMessage, environment []string) (json.RawMes
 	kvs := extractKVsFromEnvironment(environment)
 	for _, kv := range kvs {
 		key, value := kv[0], kv[1]
-		data := []byte(value)
-		if !json.Valid(data) {
-			return nil, fmt.Errorf("%w; key=%q value=%q", ErrInvalidJSONValue, key, value)
+		data, err := yaml.YAMLToJSONStrict([]byte(value))
+		if err != nil {
+			return nil, fmt.Errorf("convert yaml to json; key=%q value=%q: %w", key, value, err)
 		}
 		path := key[len(keyPrefix):]
-		var err error
 		rawConfigs, err = sjson.SetRawBytesOptions(rawConfigs, path, data, &sjson.Options{
 			Optimistic:     true,
 			ReplaceInPlace: true,
@@ -147,7 +146,7 @@ func (cs *configStore) Dump() string {
 func (cs *configStore) LoadItem(path string, item interface{}) error {
 	value := gjson.GetBytes(cs.rawConfigs, path).Raw
 	if value == "" {
-		return fmt.Errorf("%w; path=%q", ErrJSONValueNotFound, path)
+		return fmt.Errorf("%w; path=%q", ErrValueNotFound, path)
 	}
 	if err := json.Unmarshal([]byte(value), item); err != nil {
 		return fmt.Errorf("unmarshal from json; path=%q itemType=\"%T\": %w", path, item, err)
@@ -155,9 +154,5 @@ func (cs *configStore) LoadItem(path string, item interface{}) error {
 	return nil
 }
 
-// ErrInvalidJSONValue is returned when there is an invalid JSON value assigned to
-// a CONFIGSTORE.* environment variable.
-var ErrInvalidJSONValue = errors.New("configstore: invalid json value")
-
-// ErrJSONValueNotFound is returned when the JSON value does not exist.
-var ErrJSONValueNotFound = errors.New("configstore: json value not found")
+// ErrValueNotFound is returned when the JSON value does not exist.
+var ErrValueNotFound = errors.New("configstore: value not found")

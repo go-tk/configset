@@ -163,10 +163,9 @@ author: roy
 `), 644)
 				w.In.DirPath = "/my_etc"
 				w.In.Environment = []string{
-					"CONFIGSTORE.aaa.hello=hi",
+					"CONFIGSTORE.aaa.hello='",
 				}
-				w.ExpOut.ErrStr = "configstore: invalid json value; key=\"CONFIGSTORE.aaa.hello\" value=\"hi\""
-				w.ExpOut.Err = ErrInvalidJSONValue
+				w.ExpOut.ErrStr = "convert yaml to json; key=\"CONFIGSTORE.aaa.hello\" value=\"'\": yaml: found unexpected end of stream"
 			}),
 		tc.Copy().
 			Given("environment with bad overriding values (2)").
@@ -290,7 +289,7 @@ author: roy
 				w.ExpOut.Item = &[]int{1, 2, 3}
 			}),
 		tc.Copy().
-			Given("unexpected json value").
+			Given("unexpected value").
 			Then("should fail").
 			Step(.5, func(t *testing.T, w *Workspace) {
 				w.Init.MemMapFs.Mkdir("/my_etc", 755)
@@ -314,7 +313,7 @@ author: 1
 				w.ExpOut.ErrStr = "unmarshal from json; path=\"gogo\" itemType=\"*configstore_test.GoGo\": json: cannot unmarshal number into Go struct field GoGo.author of type string"
 			}),
 		tc.Copy().
-			Given("no json value corresponding to path").
+			Given("no value corresponding to path").
 			Then("should fail").
 			Step(.5, func(t *testing.T, w *Workspace) {
 				w.Init.MemMapFs.Mkdir("/my_etc", 755)
@@ -331,29 +330,8 @@ my_numbers: [1,2,3]
 				}
 				w.In.Path = "gogo"
 				w.In.Item = &GoGo{}
-				w.ExpOut.ErrStr = "configstore: json value not found; path=\"gogo\""
-				w.ExpOut.Err = ErrJSONValueNotFound
-			}),
-		tc.Copy().
-			Given("no json value corresponding to path").
-			Then("should fail").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 755)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
-hello: world
-my_numbers: [1,2,3]
-`), 644)
-				w.Init.DirPath = "/my_etc"
-			}).
-			Step(1.5, func(t *testing.T, w *Workspace) {
-				type GoGo struct {
-					Version int    `json:"version"`
-					Author  string `json:"author"`
-				}
-				w.In.Path = "gogo"
-				w.In.Item = &GoGo{}
-				w.ExpOut.ErrStr = "configstore: json value not found; path=\"gogo\""
-				w.ExpOut.Err = ErrJSONValueNotFound
+				w.ExpOut.ErrStr = "configstore: value not found; path=\"gogo\""
+				w.ExpOut.Err = ErrValueNotFound
 			}),
 	)
 }

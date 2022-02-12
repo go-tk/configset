@@ -9,7 +9,7 @@ import (
 )
 
 func Example() {
-	// Create configuration files for testing.
+	// 1. Create configuration files for testing.
 	_ = os.Mkdir("./temp", 0755)
 
 	ioutil.WriteFile("./temp/foo.yaml", []byte(`
@@ -26,22 +26,22 @@ secrets:
     - 5
 `), 0644)
 
-	// Override configuration items by environment variables.
-	os.Setenv("CONFIGSTORE.foo.nickname", "\"lisa\"")
-	os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99")
+	// 2. Override configuration items by environment variables.
+	os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value must be valid YAML
+	os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value must be valid YAML
 
-	// Read in configuration files.
+	// 3. Read in configuration files.
 	configstore.MustOpen("./temp")
 
-	// Dump the whole configuration in form of JSON for debugging.
+	// 4. Dump the whole configuration in form of JSON for debugging.
 	json := configstore.Dump()
 	fmt.Println("===== Dump =====")
 	fmt.Println(json)
 
-	// Load a configstore item into a struct.
+	// 5. Load a configstore item into a struct.
 	var secrets struct {
-		Password    string `json:"password"`     // Use json tag rather than yaml tag
-		LuckNumbers []int  `json:"luck_numbers"` // Use json tag rather than yaml tag
+		Password    string `json:"password"`     // use json tag rather than yaml tag
+		LuckNumbers []int  `json:"luck_numbers"` // use json tag rather than yaml tag
 	}
 	configstore.MustLoadItem("bar.secrets", &secrets)
 	fmt.Println("===== MustLoadItem  =====")
