@@ -15,6 +15,11 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+var (
+	fsFactory          = func() afero.Fs { return afero.NewOsFs() }
+	environmentFactory = func() []string { return os.Environ() }
+)
+
 var cs *configStore
 
 // Open sets up the config store.
@@ -23,8 +28,8 @@ var cs *configStore
 // If there are environment variables set such as CONFIGSTORE.{path}={value},
 // the cache will be overwritten according to paths and values.
 func Open(dirPath string) error {
-	fs := afero.NewOsFs()
-	environment := os.Environ()
+	fs := fsFactory()
+	environment := environmentFactory()
 	var err error
 	cs, err = openConfigStore(fs, dirPath, environment)
 	if err != nil {

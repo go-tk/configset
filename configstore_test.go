@@ -2,8 +2,6 @@ package configstore_test
 
 import (
 	"errors"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/go-tk/configstore"
@@ -63,7 +61,7 @@ func TestOpenConfigStore(t *testing.T) {
 			Given("directory without good configuration files").
 			Then("should succeed").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 755)
+				w.In.MemMapFs.Mkdir("/my_etc", 0755)
 				w.In.DirPath = "/my_etc"
 				w.ExpSt.JSON = "{}"
 			}),
@@ -71,15 +69,15 @@ func TestOpenConfigStore(t *testing.T) {
 			Given("directory with configuration files").
 			Then("should succeed").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 755)
+				w.In.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 numbers: [1,2,3]
-`), 644)
+`), 0644)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
 author: roy
-`), 644)
+`), 0644)
 				w.In.DirPath = "/my_etc"
 				w.ExpSt.JSON = `{
   "aaa": {
@@ -100,15 +98,15 @@ author: roy
 			Given("environment with good overriding values").
 			Then("should succeed").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 755)
+				w.In.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 numbers: [1,2,3]
-`), 644)
+`), 0644)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
 author: roy
-`), 644)
+`), 0644)
 				w.In.DirPath = "/my_etc"
 				w.In.Environment = []string{
 					"FOO=BAR",
@@ -139,15 +137,15 @@ author: roy
 			Given("directory with bad configuration files").
 			Then("should fail").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 755)
+				w.In.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 numbers: [1,2,3
-`), 644)
+`), 0644)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
 author: roy
-`), 644)
+`), 0644)
 				w.In.DirPath = "/my_etc"
 				w.ExpOut.ErrStr = "convert yaml to json; filePath=\"/my_etc/aaa.yaml\": yaml: line 3: did not find expected ',' or ']'"
 			}),
@@ -155,15 +153,15 @@ author: roy
 			Given("environment with bad overriding values (1)").
 			Then("should fail").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 755)
+				w.In.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 numbers: [1,2,3]
-`), 644)
+`), 0644)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
 author: roy
-`), 644)
+`), 0644)
 				w.In.DirPath = "/my_etc"
 				w.In.Environment = []string{
 					"CONFIGSTORE.aaa.hello='",
@@ -174,15 +172,15 @@ author: roy
 			Given("environment with bad overriding values (2)").
 			Then("should fail").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 755)
+				w.In.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 numbers: [1,2,3]
-`), 644)
+`), 0644)
 				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
 author: roy
-`), 644)
+`), 0644)
 				w.In.DirPath = "/my_etc"
 				w.In.Environment = []string{
 					"CONFIGSTORE.=1",
@@ -245,15 +243,15 @@ func TestConfigStore_LoadItem(t *testing.T) {
 		tc.Copy().
 			Then("should succeed").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 755)
+				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 my_numbers: [1,2,3]
-`), 644)
+`), 0644)
 				afero.WriteFile(w.Init.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
 author: roy
-`), 644)
+`), 0644)
 				w.Init.DirPath = "/my_etc"
 				w.Init.Environment = []string{
 					"CONFIGSTORE.aaa.my_numbers.1=-2",
@@ -274,15 +272,15 @@ author: roy
 		tc.Copy().
 			Then("should succeed").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 755)
+				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 my_numbers: [1,2,3]
-`), 644)
+`), 0644)
 				afero.WriteFile(w.Init.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: [1,2,3]
 author: roy
-`), 644)
+`), 0644)
 				w.Init.DirPath = "/my_etc"
 			}).
 			Step(1.5, func(t *testing.T, w *Workspace) {
@@ -295,15 +293,15 @@ author: roy
 			Given("unexpected value").
 			Then("should fail").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 755)
+				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 my_numbers: [1,2,3]
-`), 644)
+`), 0644)
 				afero.WriteFile(w.Init.MemMapFs, "/my_etc/gogo.yaml", []byte(`
 version: 1
 author: 1
-`), 644)
+`), 0644)
 				w.Init.DirPath = "/my_etc"
 			}).
 			Step(1.5, func(t *testing.T, w *Workspace) {
@@ -319,11 +317,11 @@ author: 1
 			Given("no value corresponding to path").
 			Then("should fail").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 755)
+				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
 				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 my_numbers: [1,2,3]
-`), 644)
+`), 0644)
 				w.Init.DirPath = "/my_etc"
 			}).
 			Step(1.5, func(t *testing.T, w *Workspace) {
@@ -340,28 +338,28 @@ my_numbers: [1,2,3]
 }
 
 func TestMustOpen(t *testing.T) {
-	_ = os.Mkdir("./temp", 0755)
-	err := ioutil.WriteFile("./temp/foo.yaml", []byte(`
+	fs := afero.NewMemMapFs()
+	_ = fs.Mkdir("/my_etc", 0755)
+	err := afero.WriteFile(fs, "/my_etc/foo.yaml", []byte(`
 bar: "
 `), 0644)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
-	assert.PanicsWithValue(t, "open config store: convert yaml to json; filePath=\"temp/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
-		configstore.MustOpen("./temp")
+	ff := *configstore.FsFactory
+	*configstore.FsFactory = func() afero.Fs { return fs }
+	defer func() { *configstore.FsFactory = ff }()
+	assert.PanicsWithValue(t, "open config store: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
+		configstore.MustOpen("/my_etc")
 	})
 }
 
 func TestMustLoadItem(t *testing.T) {
-	_ = os.Mkdir("./temp", 0755)
-	err := ioutil.WriteFile("./temp/foo.yaml", []byte(`
-bar: 100
-`), 0644)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	ef := *configstore.EnvironmentFactory
+	*configstore.EnvironmentFactory = func() []string { return []string{"CONFIGSTORE.foo.bar=100"} }
+	defer func() { *configstore.EnvironmentFactory = ef }()
 	assert.PanicsWithValue(t, "load item: unmarshal from json; path=\"foo.bar\" itemType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
-		configstore.MustOpen("./temp")
+		configstore.MustOpen("/my_etc")
 		var s string
 		configstore.MustLoadItem("foo.bar", &s)
 	})
