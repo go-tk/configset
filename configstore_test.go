@@ -2,8 +2,11 @@ package configstore_test
 
 import (
 	"errors"
+	"io/ioutil"
+	"os"
 	"testing"
 
+	"github.com/go-tk/configstore"
 	. "github.com/go-tk/configstore"
 	"github.com/go-tk/testcase"
 	"github.com/spf13/afero"
@@ -334,4 +337,32 @@ my_numbers: [1,2,3]
 				w.ExpOut.Err = ErrValueNotFound
 			}),
 	)
+}
+
+func TestMustOpen(t *testing.T) {
+	_ = os.Mkdir("./temp", 0755)
+	err := ioutil.WriteFile("./temp/foo.yaml", []byte(`
+bar: "
+`), 0644)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	assert.PanicsWithValue(t, "open config store: convert yaml to json; filePath=\"temp/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
+		configstore.MustOpen("./temp")
+	})
+}
+
+func TestMustLoadItem(t *testing.T) {
+	_ = os.Mkdir("./temp", 0755)
+	err := ioutil.WriteFile("./temp/foo.yaml", []byte(`
+bar: 100
+`), 0644)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	assert.PanicsWithValue(t, "load item: unmarshal from json; path=\"foo.bar\" itemType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
+		configstore.MustOpen("./temp")
+		var s string
+		configstore.MustLoadItem("foo.bar", &s)
+	})
 }
