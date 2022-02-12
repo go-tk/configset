@@ -4,7 +4,7 @@
 [![Workflow Status](https://github.com/go-tk/configstore/actions/workflows/main.yaml/badge.svg?branch=main)](https://github.com/go-tk/configstore/actions)
 [![Coverage Status](https://codecov.io/gh/go-tk/configstore/branch/main/graph/badge.svg)](https://codecov.io/gh/go-tk/configstore)
 
-Simplistic configuration library
+Simple configuration library
 
 ## Features
 
