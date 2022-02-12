@@ -26,9 +26,9 @@ secrets:
     - 5
 `), 0644)
 
-	// 2. Override configuration items by environment variables.
-	os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value must be valid YAML
-	os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value must be valid YAML
+	// 2. Override configuration items via environment variables.
+	os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value should be valid YAML
+	os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
 	// 3. Read in configuration files.
 	configstore.MustOpen("./temp")
@@ -40,8 +40,8 @@ secrets:
 
 	// 5. Load a configstore item into a struct.
 	var secrets struct {
-		Password    string `json:"password"`     // use json tag rather than yaml tag
-		LuckNumbers []int  `json:"luck_numbers"` // use json tag rather than yaml tag
+		Password    string `json:"password"`     // should use json tag rather than yaml tag
+		LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
 	}
 	configstore.MustLoadItem("bar.secrets", &secrets)
 	fmt.Println("===== MustLoadItem  =====")
