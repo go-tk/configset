@@ -114,7 +114,7 @@ func patchConfigs(rawConfigs json.RawMessage, environment []string) (json.RawMes
 			ReplaceInPlace: true,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("set json value; path=%v: %w", path, err)
+			return nil, fmt.Errorf("set json value; path=%q: %w", path, err)
 		}
 	}
 	return rawConfigs, nil
