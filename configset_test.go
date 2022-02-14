@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOpenConfigSet(t *testing.T) {
+func TestLoadConfigSet(t *testing.T) {
 	type Workspace struct {
-		CS *ConfigSet
+		CS ConfigSet
 		In struct {
 			MemMapFs    *afero.MemMapFs
 			DirPath     string
@@ -32,8 +32,7 @@ func TestOpenConfigSet(t *testing.T) {
 			w.In.MemMapFs = afero.NewMemMapFs().(*afero.MemMapFs)
 		}).
 		Step(1, func(t *testing.T, w *Workspace) {
-			var err error
-			w.CS, err = OpenConfigSet(w.In.MemMapFs, w.In.DirPath, w.In.Environment)
+			err := w.CS.Load(w.In.MemMapFs, w.In.DirPath, w.In.Environment)
 			if err != nil {
 				w.ActOut.ErrStr = err.Error()
 				w.ActOut.Err = err
@@ -51,7 +50,7 @@ func TestOpenConfigSet(t *testing.T) {
 			assert.Equal(t, w.ExpOut, w.ActOut)
 		}).
 		Step(3, func(t *testing.T, w *Workspace) {
-			if w.CS != nil {
+			if w.CS.IsLoaded() {
 				w.ActSt.JSON = string(w.CS.Dump("", ""))
 			}
 			assert.Equal(t, w.ExpSt, w.ActSt)
@@ -162,7 +161,7 @@ author: roy
 
 func TestConfigSet_ReadValue(t *testing.T) {
 	type Workspace struct {
-		CS   *ConfigSet
+		CS   ConfigSet
 		Init struct {
 			MemMapFs    *afero.MemMapFs
 			DirPath     string
@@ -183,8 +182,7 @@ func TestConfigSet_ReadValue(t *testing.T) {
 			w.Init.MemMapFs = afero.NewMemMapFs().(*afero.MemMapFs)
 		}).
 		Step(1, func(t *testing.T, w *Workspace) {
-			var err error
-			w.CS, err = OpenConfigSet(w.Init.MemMapFs, w.Init.DirPath, w.Init.Environment)
+			err := w.CS.Load(w.Init.MemMapFs, w.Init.DirPath, w.Init.Environment)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}
@@ -307,7 +305,7 @@ my_numbers: [1,2,3]
 	)
 }
 
-func TestMustOpen(t *testing.T) {
+func TestMustLoad(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	_ = fs.Mkdir("/my_etc", 0755)
 	err := afero.WriteFile(fs, "/my_etc/foo.yaml", []byte(`
@@ -319,8 +317,8 @@ bar: "
 	ff := *configset.FsFactory
 	*configset.FsFactory = func() afero.Fs { return fs }
 	defer func() { *configset.FsFactory = ff }()
-	assert.PanicsWithValue(t, "open config set: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
-		configset.MustOpen("/my_etc")
+	assert.PanicsWithValue(t, "load config set: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
+		configset.MustLoad("/my_etc")
 	})
 }
 
@@ -329,7 +327,7 @@ func TestMustReadValue(t *testing.T) {
 	*configset.EnvironmentFactory = func() []string { return []string{"CONFIGSET.foo.bar=100"} }
 	defer func() { *configset.EnvironmentFactory = ef }()
 	assert.PanicsWithValue(t, "read value: unmarshal from json; path=\"foo.bar\" configType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
-		configset.MustOpen("/my_etc")
+		configset.MustLoad("/my_etc")
 		var s string
 		configset.MustReadValue("foo.bar", &s)
 	})

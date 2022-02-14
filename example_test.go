@@ -31,7 +31,7 @@ secrets:
 	os.Setenv("CONFIGSET.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
 	// 3. Read in configuration files.
-	configset.MustOpen("./temp")
+	configset.MustLoad("./temp")
 
 	// 4. Dump the configuration set in form of JSON for debugging.
 	json := string(configset.Dump("", "  "))

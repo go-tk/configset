@@ -7,4 +7,4 @@ var (
 
 type ConfigSet = configSet
 
-var OpenConfigSet = openConfigSet
+func (cs *ConfigSet) IsLoaded() bool { return cs.raw != nil }

@@ -20,32 +20,26 @@ var (
 	environmentFactory = func() []string { return os.Environ() }
 )
 
-var cs *configSet
+var cs configSet
 
-// Open sets up the config set.
-// All *.yaml files under the given directory will be read into a cache.
+// Load loads the config set from all *.yaml files under the given directory.
 // If there are environment variables set such as CONFIGSET.{path}={value},
-// the cache will be overwritten according to {paths} and {values}.
-func Open(dirPath string) error {
+// the config set will be overwritten according to {paths} and {values}.
+func Load(dirPath string) error {
 	fs := fsFactory()
 	environment := environmentFactory()
-	var err error
-	cs, err = openConfigSet(fs, dirPath, environment)
-	if err != nil {
-		return err
-	}
-	return nil
+	return cs.Load(fs, dirPath, environment)
 }
 
-// MustOpen likes Open but panics when an error occurs.
-func MustOpen(dirPath string) {
-	if err := Open(dirPath); err != nil {
-		panic(fmt.Sprintf("open config set: %v", err))
+// MustLoad likes Load but panics when an error occurs.
+func MustLoad(dirPath string) {
+	if err := Load(dirPath); err != nil {
+		panic(fmt.Sprintf("load config set: %v", err))
 	}
 }
 
-// ReadValue finds the value for the given path from the cache and unmarshals
-// the given config from that value in form of JSON.
+// ReadValue finds the value for the given path from the config se and
+// unmarshals the given config from that value in form of JSON.
 // If no value can be found by the path, ErrValueNotFound is returned.
 func ReadValue(path string, config interface{}) error { return cs.ReadValue(path, config) }
 
@@ -56,25 +50,24 @@ func MustReadValue(path string, config interface{}) {
 	}
 }
 
-// Dump returns the cache in form of JSON.
+// Dump returns the config set in form of JSON.
 func Dump(prefix string, indention string) json.RawMessage { return cs.Dump(prefix, indention) }
 
 type configSet struct {
 	raw json.RawMessage
 }
 
-func openConfigSet(fs afero.Fs, dirPath string, environment []string) (*configSet, error) {
-	rawConfigSet, err := gatherConfigs(fs, dirPath)
+func (cs *configSet) Load(fs afero.Fs, dirPath string, environment []string) error {
+	raw, err := gatherConfigs(fs, dirPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	rawConfigSet, err = patchConfigSet(rawConfigSet, environment)
+	raw, err = overwriteConfigSet(raw, environment)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &configSet{
-		raw: rawConfigSet,
-	}, nil
+	cs.raw = raw
+	return nil
 }
 
 func gatherConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
@@ -103,7 +96,7 @@ func gatherConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
 	return rawConfigSet, nil
 }
 
-func patchConfigSet(rawConfigSet json.RawMessage, environment []string) (json.RawMessage, error) {
+func overwriteConfigSet(rawConfigSet json.RawMessage, environment []string) (json.RawMessage, error) {
 	kvs := extractKVs(environment)
 	for _, kv := range kvs {
 		key, value := kv[0], kv[1]
