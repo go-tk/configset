@@ -160,7 +160,7 @@ author: roy
 	)
 }
 
-func TestConfigSet_LoadItem(t *testing.T) {
+func TestConfigSet_ReadValue(t *testing.T) {
 	type Workspace struct {
 		CS   *ConfigSet
 		Init struct {
@@ -169,11 +169,11 @@ func TestConfigSet_LoadItem(t *testing.T) {
 			Environment []string
 		}
 		In struct {
-			Path string
-			Item interface{}
+			Path   string
+			Config interface{}
 		}
 		ExpOut, ActOut struct {
-			Item   interface{}
+			Config interface{}
 			ErrStr string
 			Err    error
 		}
@@ -190,9 +190,9 @@ func TestConfigSet_LoadItem(t *testing.T) {
 			}
 		}).
 		Step(2, func(t *testing.T, w *Workspace) {
-			err := w.CS.LoadItem(w.In.Path, w.In.Item)
+			err := w.CS.ReadValue(w.In.Path, w.In.Config)
 			if err == nil {
-				w.ActOut.Item = w.In.Item
+				w.ActOut.Config = w.In.Config
 			} else {
 				w.ActOut.ErrStr = err.Error()
 				w.ActOut.Err = err
@@ -233,8 +233,8 @@ author: roy
 					MyNumbers []int  `json:"my_numbers"`
 				}
 				w.In.Path = "aaa"
-				w.In.Item = &AAA{}
-				w.ExpOut.Item = &AAA{
+				w.In.Config = &AAA{}
+				w.ExpOut.Config = &AAA{
 					Hello:     "world",
 					MyNumbers: []int{1, -2, 3},
 				}
@@ -256,8 +256,8 @@ author: roy
 			Step(1.5, func(t *testing.T, w *Workspace) {
 				var my_numbers []int
 				w.In.Path = "gogo.version"
-				w.In.Item = &my_numbers
-				w.ExpOut.Item = &[]int{1, 2, 3}
+				w.In.Config = &my_numbers
+				w.ExpOut.Config = &[]int{1, 2, 3}
 			}),
 		tc.Copy().
 			Given("unexpected value").
@@ -280,8 +280,8 @@ author: 1
 					Author  string `json:"author"`
 				}
 				w.In.Path = "gogo"
-				w.In.Item = &GoGo{}
-				w.ExpOut.ErrStr = "unmarshal from json; path=\"gogo\" itemType=\"*configset_test.GoGo\": json: cannot unmarshal number into Go struct field GoGo.author of type string"
+				w.In.Config = &GoGo{}
+				w.ExpOut.ErrStr = "unmarshal from json; path=\"gogo\" configType=\"*configset_test.GoGo\": json: cannot unmarshal number into Go struct field GoGo.author of type string"
 			}),
 		tc.Copy().
 			Given("no value corresponding to path").
@@ -300,7 +300,7 @@ my_numbers: [1,2,3]
 					Author  string `json:"author"`
 				}
 				w.In.Path = "gogo"
-				w.In.Item = &GoGo{}
+				w.In.Config = &GoGo{}
 				w.ExpOut.ErrStr = "configset: value not found; path=\"gogo\""
 				w.ExpOut.Err = ErrValueNotFound
 			}),
@@ -324,13 +324,13 @@ bar: "
 	})
 }
 
-func TestMustLoadItem(t *testing.T) {
+func TestMustReadValue(t *testing.T) {
 	ef := *configset.EnvironmentFactory
 	*configset.EnvironmentFactory = func() []string { return []string{"CONFIGSET.foo.bar=100"} }
 	defer func() { *configset.EnvironmentFactory = ef }()
-	assert.PanicsWithValue(t, "load item: unmarshal from json; path=\"foo.bar\" itemType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
+	assert.PanicsWithValue(t, "read value: unmarshal from json; path=\"foo.bar\" configType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
 		configset.MustOpen("/my_etc")
 		var s string
-		configset.MustLoadItem("foo.bar", &s)
+		configset.MustReadValue("foo.bar", &s)
 	})
 }

@@ -44,15 +44,15 @@ func MustOpen(dirPath string) {
 	}
 }
 
-// LoadItem finds the value for the given path from the cache and unmarshals
-// the given item from that value in form of JSON.
+// ReadValue finds the value for the given path from the cache and unmarshals
+// the given config from that value in form of JSON.
 // If no value can be found by the path, ErrValueNotFound is returned.
-func LoadItem(path string, item interface{}) error { return cs.LoadItem(path, item) }
+func ReadValue(path string, config interface{}) error { return cs.ReadValue(path, config) }
 
-// MustLoadItem likes LoadItem but panics when an error occurs.
-func MustLoadItem(path string, item interface{}) {
-	if err := LoadItem(path, item); err != nil {
-		panic(fmt.Sprintf("load item: %v", err))
+// MustReadValue likes ReadValue but panics when an error occurs.
+func MustReadValue(path string, config interface{}) {
+	if err := ReadValue(path, config); err != nil {
+		panic(fmt.Sprintf("read value: %v", err))
 	}
 }
 
@@ -141,13 +141,13 @@ func extractKVs(environment []string) [][2]string {
 	return kvs
 }
 
-func (cs *configSet) LoadItem(path string, item interface{}) error {
+func (cs *configSet) ReadValue(path string, config interface{}) error {
 	value := gjson.GetBytes(cs.raw, path).Raw
 	if value == "" {
 		return fmt.Errorf("%w; path=%q", ErrValueNotFound, path)
 	}
-	if err := json.Unmarshal([]byte(value), item); err != nil {
-		return fmt.Errorf("unmarshal from json; path=%q itemType=\"%T\": %w", path, item, err)
+	if err := json.Unmarshal([]byte(value), config); err != nil {
+		return fmt.Errorf("unmarshal from json; path=%q configType=\"%T\": %w", path, config, err)
 	}
 	return nil
 }

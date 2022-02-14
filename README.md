@@ -71,12 +71,12 @@ secrets:
         //   }
         // }
 
-        // 5. Load a configuration value into a struct.
+        // 5. Read a configuration value into a struct.
         var secrets struct {
                 Password    string `json:"password"`     // should use json tag rather than yaml tag
                 LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
         }
-        configset.MustLoadItem("bar.secrets", &secrets)
+        configset.MustReadValue("bar.secrets", &secrets)
         fmt.Printf("%v\n", secrets)
         // output:
         // {s0g00d [1 99 5]}

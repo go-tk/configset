@@ -38,13 +38,13 @@ secrets:
 	fmt.Println("===== Dump =====")
 	fmt.Print(json)
 
-	// 5. Load a configuration value into a struct.
+	// 5. Read a configuration value into a struct.
 	var secrets struct {
 		Password    string `json:"password"`     // should use json tag rather than yaml tag
 		LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
 	}
-	configset.MustLoadItem("bar.secrets", &secrets)
-	fmt.Println("===== MustLoadItem  =====")
+	configset.MustReadValue("bar.secrets", &secrets)
+	fmt.Println("===== ReadValue  =====")
 	fmt.Printf("%v\n", secrets)
 
 	// output:
@@ -65,6 +65,6 @@ secrets:
 	//     "user_id": 1000
 	//   }
 	// }
-	// ===== MustLoadItem  =====
+	// ===== ReadValue  =====
 	// {s0g00d [1 99 5]}
 }
