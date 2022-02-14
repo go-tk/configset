@@ -33,12 +33,12 @@ secrets:
 	// 3. Read in configuration files.
 	configset.MustOpen("./temp")
 
-	// 4. Dump the whole configuration in form of JSON for debugging.
+	// 4. Dump the configuration set in form of JSON for debugging.
 	json := string(configset.Dump("", "  "))
 	fmt.Println("===== Dump =====")
 	fmt.Print(json)
 
-	// 5. Load a configuration item by a path.
+	// 5. Load a configuration value into a struct.
 	var secrets struct {
 		Password    string `json:"password"`     // should use json tag rather than yaml tag
 		LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag

@@ -71,7 +71,7 @@ secrets:
         //   }
         // }
 
-        // 5. Load a configuration item by a path.
+        // 5. Load a configuration value into a struct.
         var secrets struct {
                 Password    string `json:"password"`     // should use json tag rather than yaml tag
                 LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
