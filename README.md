@@ -1,8 +1,8 @@
-# configstore
+# configset
 
-[![GoDev](https://pkg.go.dev/badge/golang.org/x/pkgsite.svg)](https://pkg.go.dev/github.com/go-tk/configstore)
-[![Workflow Status](https://github.com/go-tk/configstore/actions/workflows/main.yaml/badge.svg?branch=main)](https://github.com/go-tk/configstore/actions)
-[![Coverage Status](https://codecov.io/gh/go-tk/configstore/branch/main/graph/badge.svg)](https://codecov.io/gh/go-tk/configstore)
+[![GoDev](https://pkg.go.dev/badge/golang.org/x/pkgsite.svg)](https://pkg.go.dev/github.com/go-tk/configset)
+[![Workflow Status](https://github.com/go-tk/configset/actions/workflows/main.yaml/badge.svg?branch=main)](https://github.com/go-tk/configset/actions)
+[![Coverage Status](https://codecov.io/gh/go-tk/configset/branch/main/graph/badge.svg)](https://codecov.io/gh/go-tk/configset)
 
 Simple & powerful configuration library
 
@@ -22,7 +22,7 @@ import (
         "io/ioutil"
         "os"
 
-        "github.com/go-tk/configstore"
+        "github.com/go-tk/configset"
 )
 
 func main() {
@@ -44,15 +44,15 @@ secrets:
 `), 0644)
 
         // 2. Override configuration values with environment variables.
-        os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value should be valid YAML
-        os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
+        os.Setenv("CONFIGSET.foo.nickname", "lisa")             // env value should be valid YAML
+        os.Setenv("CONFIGSET.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
         // 3. Read in configuration files.
-        configstore.MustOpen("./temp")
+        configset.MustOpen("./temp")
 
-        // 4. Dump the whole configuration in form of JSON for debugging.
-        data, _ := json.MarshalIndent(configstore.Cache(), "", "  ")
-        fmt.Printf("%s\n", data)
+        // 4. Dump the configuration set in form of JSON for debugging.
+        json := string(configset.Dump("", "  "))
+        fmt.Print(json)
         // output:
         // {
         //   "bar": {
@@ -76,7 +76,7 @@ secrets:
                 Password    string `json:"password"`     // should use json tag rather than yaml tag
                 LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
         }
-        configstore.MustLoadItem("bar.secrets", &secrets)
+        configset.MustLoadItem("bar.secrets", &secrets)
         fmt.Printf("%v\n", secrets)
         // output:
         // {s0g00d [1 99 5]}

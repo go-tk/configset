@@ -1,4 +1,4 @@
-module github.com/go-tk/configstore
+module github.com/go-tk/configset
 
 go 1.17
 

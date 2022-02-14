@@ -1,10 +1,10 @@
-package configstore
+package configset
 
 var (
 	FsFactory          = &fsFactory
 	EnvironmentFactory = &environmentFactory
 )
 
-type ConfigStore = configStore
+type ConfigSet = configSet
 
-var OpenConfigStore = openConfigStore
+var OpenConfigSet = openConfigSet

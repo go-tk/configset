@@ -1,21 +1,19 @@
-package configstore_test
+package configset_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"testing"
 
-	"github.com/go-tk/configstore"
-	. "github.com/go-tk/configstore"
+	"github.com/go-tk/configset"
+	. "github.com/go-tk/configset"
 	"github.com/go-tk/testcase"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOpenConfigStore(t *testing.T) {
+func TestOpenConfigSet(t *testing.T) {
 	type Workspace struct {
-		CS *ConfigStore
+		CS *ConfigSet
 		In struct {
 			MemMapFs    *afero.MemMapFs
 			DirPath     string
@@ -35,7 +33,7 @@ func TestOpenConfigStore(t *testing.T) {
 		}).
 		Step(1, func(t *testing.T, w *Workspace) {
 			var err error
-			w.CS, err = OpenConfigStore(w.In.MemMapFs, w.In.DirPath, w.In.Environment)
+			w.CS, err = OpenConfigSet(w.In.MemMapFs, w.In.DirPath, w.In.Environment)
 			if err != nil {
 				w.ActOut.ErrStr = err.Error()
 				w.ActOut.Err = err
@@ -54,9 +52,7 @@ func TestOpenConfigStore(t *testing.T) {
 		}).
 		Step(3, func(t *testing.T, w *Workspace) {
 			if w.CS != nil {
-				var b bytes.Buffer
-				json.Indent(&b, w.CS.Cache(), "", "  ")
-				w.ActSt.JSON = b.String()
+				w.ActSt.JSON = string(w.CS.Dump("", ""))
 			}
 			assert.Equal(t, w.ExpSt, w.ActSt)
 		})
@@ -83,20 +79,7 @@ version: 1.0
 author: roy
 `), 0644)
 				w.In.DirPath = "/my_etc"
-				w.ExpSt.JSON = `{
-  "aaa": {
-    "hello": "world",
-    "numbers": [
-      1,
-      2,
-      3
-    ]
-  },
-  "gogo": {
-    "author": "roy",
-    "version": 1
-  }
-}`
+				w.ExpSt.JSON = `{"aaa":{"hello":"world","numbers":[1,2,3]},"gogo":{"author":"roy","version":1}}`
 			}),
 		tc.Copy().
 			Given("environment with good overriding values").
@@ -114,28 +97,11 @@ author: roy
 				w.In.DirPath = "/my_etc"
 				w.In.Environment = []string{
 					"FOO=BAR",
-					"CONFIGSTORE.aaa.hello=\"hi\"",
-					"CONFIGSTORE.aaa.numbers.1=-2",
-					`CONFIGSTORE.gogo.version={"x": 1, "y": 2, "z": 3}`,
+					"CONFIGSET.aaa.hello=\"hi\"",
+					"CONFIGSET.aaa.numbers.1=-2",
+					`CONFIGSET.gogo.version={"x": 1, "y": 2, "z": 3}`,
 				}
-				w.ExpSt.JSON = `{
-  "aaa": {
-    "hello": "hi",
-    "numbers": [
-      1,
-      -2,
-      3
-    ]
-  },
-  "gogo": {
-    "author": "roy",
-    "version": {
-      "x": 1,
-      "y": 2,
-      "z": 3
-    }
-  }
-}`
+				w.ExpSt.JSON = `{"aaa":{"hello":"hi","numbers":[1,-2,3]},"gogo":{"author":"roy","version":{"x":1,"y":2,"z":3}}}`
 			}),
 		tc.Copy().
 			Given("directory with bad configuration files").
@@ -168,9 +134,9 @@ author: roy
 `), 0644)
 				w.In.DirPath = "/my_etc"
 				w.In.Environment = []string{
-					"CONFIGSTORE.aaa.hello='",
+					"CONFIGSET.aaa.hello='",
 				}
-				w.ExpOut.ErrStr = "convert yaml to json; key=\"CONFIGSTORE.aaa.hello\" value=\"'\": yaml: found unexpected end of stream"
+				w.ExpOut.ErrStr = "convert yaml to json; key=\"CONFIGSET.aaa.hello\" value=\"'\": yaml: found unexpected end of stream"
 			}),
 		tc.Copy().
 			Given("environment with bad overriding values (2)").
@@ -187,16 +153,16 @@ author: roy
 `), 0644)
 				w.In.DirPath = "/my_etc"
 				w.In.Environment = []string{
-					"CONFIGSTORE.=1",
+					"CONFIGSET.=1",
 				}
 				w.ExpOut.ErrStr = "set json value; path=\"\": path cannot be empty"
 			}),
 	)
 }
 
-func TestConfigStore_LoadItem(t *testing.T) {
+func TestConfigSet_LoadItem(t *testing.T) {
 	type Workspace struct {
-		CS   *ConfigStore
+		CS   *ConfigSet
 		Init struct {
 			MemMapFs    *afero.MemMapFs
 			DirPath     string
@@ -218,7 +184,7 @@ func TestConfigStore_LoadItem(t *testing.T) {
 		}).
 		Step(1, func(t *testing.T, w *Workspace) {
 			var err error
-			w.CS, err = OpenConfigStore(w.Init.MemMapFs, w.Init.DirPath, w.Init.Environment)
+			w.CS, err = OpenConfigSet(w.Init.MemMapFs, w.Init.DirPath, w.Init.Environment)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}
@@ -258,7 +224,7 @@ author: roy
 `), 0644)
 				w.Init.DirPath = "/my_etc"
 				w.Init.Environment = []string{
-					"CONFIGSTORE.aaa.my_numbers.1=-2",
+					"CONFIGSET.aaa.my_numbers.1=-2",
 				}
 			}).
 			Step(1.5, func(t *testing.T, w *Workspace) {
@@ -315,7 +281,7 @@ author: 1
 				}
 				w.In.Path = "gogo"
 				w.In.Item = &GoGo{}
-				w.ExpOut.ErrStr = "unmarshal from json; path=\"gogo\" itemType=\"*configstore_test.GoGo\": json: cannot unmarshal number into Go struct field GoGo.author of type string"
+				w.ExpOut.ErrStr = "unmarshal from json; path=\"gogo\" itemType=\"*configset_test.GoGo\": json: cannot unmarshal number into Go struct field GoGo.author of type string"
 			}),
 		tc.Copy().
 			Given("no value corresponding to path").
@@ -335,7 +301,7 @@ my_numbers: [1,2,3]
 				}
 				w.In.Path = "gogo"
 				w.In.Item = &GoGo{}
-				w.ExpOut.ErrStr = "configstore: value not found; path=\"gogo\""
+				w.ExpOut.ErrStr = "configset: value not found; path=\"gogo\""
 				w.ExpOut.Err = ErrValueNotFound
 			}),
 	)
@@ -350,21 +316,21 @@ bar: "
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
-	ff := *configstore.FsFactory
-	*configstore.FsFactory = func() afero.Fs { return fs }
-	defer func() { *configstore.FsFactory = ff }()
-	assert.PanicsWithValue(t, "open config store: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
-		configstore.MustOpen("/my_etc")
+	ff := *configset.FsFactory
+	*configset.FsFactory = func() afero.Fs { return fs }
+	defer func() { *configset.FsFactory = ff }()
+	assert.PanicsWithValue(t, "open config set: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
+		configset.MustOpen("/my_etc")
 	})
 }
 
 func TestMustLoadItem(t *testing.T) {
-	ef := *configstore.EnvironmentFactory
-	*configstore.EnvironmentFactory = func() []string { return []string{"CONFIGSTORE.foo.bar=100"} }
-	defer func() { *configstore.EnvironmentFactory = ef }()
+	ef := *configset.EnvironmentFactory
+	*configset.EnvironmentFactory = func() []string { return []string{"CONFIGSET.foo.bar=100"} }
+	defer func() { *configset.EnvironmentFactory = ef }()
 	assert.PanicsWithValue(t, "load item: unmarshal from json; path=\"foo.bar\" itemType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
-		configstore.MustOpen("/my_etc")
+		configset.MustOpen("/my_etc")
 		var s string
-		configstore.MustLoadItem("foo.bar", &s)
+		configset.MustLoadItem("foo.bar", &s)
 	})
 }

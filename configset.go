@@ -1,6 +1,7 @@
-package configstore
+package configset
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,18 +20,17 @@ var (
 	environmentFactory = func() []string { return os.Environ() }
 )
 
-var cs *configStore
+var cs *configSet
 
-// Open sets up the config store.
-// All *.yaml files under the given directory will be read in and cached in
-// memory in form of JSON.
-// If there are environment variables set such as CONFIGSTORE.{path}={value},
+// Open sets up the config set.
+// All *.yaml files under the given directory will be read into a cache.
+// If there are environment variables set such as CONFIGSET.{path}={value},
 // the cache will be overwritten according to {paths} and {values}.
 func Open(dirPath string) error {
 	fs := fsFactory()
 	environment := environmentFactory()
 	var err error
-	cs, err = openConfigStore(fs, dirPath, environment)
+	cs, err = openConfigSet(fs, dirPath, environment)
 	if err != nil {
 		return err
 	}
@@ -40,18 +40,14 @@ func Open(dirPath string) error {
 // MustOpen likes Open but panics when an error occurs.
 func MustOpen(dirPath string) {
 	if err := Open(dirPath); err != nil {
-		panic(fmt.Sprintf("open config store: %v", err))
+		panic(fmt.Sprintf("open config set: %v", err))
 	}
 }
 
-// LoadItem finds the JSON value for the given path from the cache and unmarshals
-// the given item from that JSON value.
-// If no JSON value can be found by the path, ErrValueNotFound is returned.
+// LoadItem finds the value for the given path from the cache and unmarshals
+// the given item from that value in form of JSON.
+// If no value can be found by the path, ErrValueNotFound is returned.
 func LoadItem(path string, item interface{}) error { return cs.LoadItem(path, item) }
-
-// Cache returns the JSON representing the content of the *.yaml files read in,
-// and the environment variables overwritten the cache are taken into account.
-func Cache() json.RawMessage { return cs.Cache() }
 
 // MustLoadItem likes LoadItem but panics when an error occurs.
 func MustLoadItem(path string, item interface{}) {
@@ -60,25 +56,28 @@ func MustLoadItem(path string, item interface{}) {
 	}
 }
 
-type configStore struct {
-	cache json.RawMessage
+// Dump returns the cache in form of JSON.
+func Dump(prefix string, indention string) json.RawMessage { return cs.Dump(prefix, indention) }
+
+type configSet struct {
+	raw json.RawMessage
 }
 
-func openConfigStore(fs afero.Fs, dirPath string, environment []string) (*configStore, error) {
-	rawConfig, err := aggregateConfigs(fs, dirPath)
+func openConfigSet(fs afero.Fs, dirPath string, environment []string) (*configSet, error) {
+	rawConfigSet, err := gatherConfigs(fs, dirPath)
 	if err != nil {
 		return nil, err
 	}
-	rawConfig, err = patchConfig(rawConfig, environment)
+	rawConfigSet, err = patchConfigSet(rawConfigSet, environment)
 	if err != nil {
 		return nil, err
 	}
-	return &configStore{
-		cache: rawConfig,
+	return &configSet{
+		raw: rawConfigSet,
 	}, nil
 }
 
-func aggregateConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
+func gatherConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
 	pattern := filepath.Join(dirPath, "*.yaml")
 	filePaths, err := afero.Glob(fs, pattern)
 	if err != nil {
@@ -97,15 +96,15 @@ func aggregateConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
 		}
 		rawConfigs[configName] = rawConfig
 	}
-	rawConfig, err := json.Marshal(rawConfigs)
+	rawConfigSet, err := json.Marshal(rawConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("marshal to json: %w", err)
 	}
-	return rawConfig, nil
+	return rawConfigSet, nil
 }
 
-func patchConfig(rawConfig json.RawMessage, environment []string) (json.RawMessage, error) {
-	kvs := extractKVsFromEnvironment(environment)
+func patchConfigSet(rawConfigSet json.RawMessage, environment []string) (json.RawMessage, error) {
+	kvs := extractKVs(environment)
 	for _, kv := range kvs {
 		key, value := kv[0], kv[1]
 		data, err := yaml.YAMLToJSONStrict([]byte(value))
@@ -113,7 +112,7 @@ func patchConfig(rawConfig json.RawMessage, environment []string) (json.RawMessa
 			return nil, fmt.Errorf("convert yaml to json; key=%q value=%q: %w", key, value, err)
 		}
 		path := key[len(keyPrefix):]
-		rawConfig, err = sjson.SetRawBytesOptions(rawConfig, path, data, &sjson.Options{
+		rawConfigSet, err = sjson.SetRawBytesOptions(rawConfigSet, path, data, &sjson.Options{
 			Optimistic:     true,
 			ReplaceInPlace: true,
 		})
@@ -121,12 +120,12 @@ func patchConfig(rawConfig json.RawMessage, environment []string) (json.RawMessa
 			return nil, fmt.Errorf("set json value; path=%q: %w", path, err)
 		}
 	}
-	return rawConfig, nil
+	return rawConfigSet, nil
 }
 
-const keyPrefix = "CONFIGSTORE."
+const keyPrefix = "CONFIGSET."
 
-func extractKVsFromEnvironment(environment []string) [][2]string {
+func extractKVs(environment []string) [][2]string {
 	var kvs [][2]string
 	for _, rawKV := range environment {
 		if !strings.HasPrefix(rawKV, keyPrefix) {
@@ -142,8 +141,8 @@ func extractKVsFromEnvironment(environment []string) [][2]string {
 	return kvs
 }
 
-func (cs *configStore) LoadItem(path string, item interface{}) error {
-	value := gjson.GetBytes(cs.cache, path).Raw
+func (cs *configSet) LoadItem(path string, item interface{}) error {
+	value := gjson.GetBytes(cs.raw, path).Raw
 	if value == "" {
 		return fmt.Errorf("%w; path=%q", ErrValueNotFound, path)
 	}
@@ -153,7 +152,18 @@ func (cs *configStore) LoadItem(path string, item interface{}) error {
 	return nil
 }
 
-func (cs *configStore) Cache() json.RawMessage { return cs.cache }
+func (cs *configSet) Dump(prefix string, indention string) json.RawMessage {
+	if len(prefix)+len(indention) == 0 {
+		raw := make(json.RawMessage, len(cs.raw))
+		copy(raw, cs.raw)
+		return raw
+	}
+	var buffer bytes.Buffer
+	json.Indent(&buffer, cs.raw, prefix, indention)
+	buffer.WriteByte('\n')
+	raw := buffer.Bytes()
+	return raw
+}
 
 // ErrValueNotFound is returned when the JSON value does not exist.
-var ErrValueNotFound = errors.New("configstore: value not found")
+var ErrValueNotFound = errors.New("configset: value not found")

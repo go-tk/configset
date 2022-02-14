@@ -1,12 +1,11 @@
-package configstore_test
+package configset_test
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 
-	"github.com/go-tk/configstore"
+	"github.com/go-tk/configset"
 )
 
 func Example() {
@@ -28,28 +27,28 @@ secrets:
 `), 0644)
 
 	// 2. Override configuration values with environment variables.
-	os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value should be valid YAML
-	os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
+	os.Setenv("CONFIGSET.foo.nickname", "lisa")             // env value should be valid YAML
+	os.Setenv("CONFIGSET.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
 	// 3. Read in configuration files.
-	configstore.MustOpen("./temp")
+	configset.MustOpen("./temp")
 
 	// 4. Dump the whole configuration in form of JSON for debugging.
-	data, _ := json.MarshalIndent(configstore.Cache(), "", "  ")
-	fmt.Println("===== Cache =====")
-	fmt.Printf("%s\n", data)
+	json := string(configset.Dump("", "  "))
+	fmt.Println("===== Dump =====")
+	fmt.Print(json)
 
 	// 5. Load a configuration item by a path.
 	var secrets struct {
 		Password    string `json:"password"`     // should use json tag rather than yaml tag
 		LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
 	}
-	configstore.MustLoadItem("bar.secrets", &secrets)
+	configset.MustLoadItem("bar.secrets", &secrets)
 	fmt.Println("===== MustLoadItem  =====")
 	fmt.Printf("%v\n", secrets)
 
 	// output:
-	// ===== Cache =====
+	// ===== Dump =====
 	// {
 	//   "bar": {
 	//     "secrets": {
