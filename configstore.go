@@ -1,7 +1,6 @@
 package configstore
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,7 +25,7 @@ var cs *configStore
 // All *.yaml files under the given directory will be read in and cached in
 // memory in form of JSON.
 // If there are environment variables set such as CONFIGSTORE.{path}={value},
-// the cache will be overwritten according to paths and values.
+// the cache will be overwritten according to {paths} and {values}.
 func Open(dirPath string) error {
 	fs := fsFactory()
 	environment := environmentFactory()
@@ -45,13 +44,14 @@ func MustOpen(dirPath string) {
 	}
 }
 
-// Dump returns the JSON that represents the content of the *.yaml files read in.
-func Dump() string { return cs.Dump() }
-
 // LoadItem finds the JSON value for the given path from the cache and unmarshals
 // the given item from that JSON value.
 // If no JSON value can be found by the path, ErrValueNotFound is returned.
 func LoadItem(path string, item interface{}) error { return cs.LoadItem(path, item) }
+
+// Cache returns the JSON representing the content of the *.yaml files read in,
+// and the environment variables overwritten the cache are taken into account.
+func Cache() json.RawMessage { return cs.Cache() }
 
 // MustLoadItem likes LoadItem but panics when an error occurs.
 func MustLoadItem(path string, item interface{}) {
@@ -61,30 +61,30 @@ func MustLoadItem(path string, item interface{}) {
 }
 
 type configStore struct {
-	rawConfigs json.RawMessage
+	cache json.RawMessage
 }
 
 func openConfigStore(fs afero.Fs, dirPath string, environment []string) (*configStore, error) {
-	rawConfigs, err := gatherConfigs(fs, dirPath)
+	rawConfig, err := aggregateConfigs(fs, dirPath)
 	if err != nil {
 		return nil, err
 	}
-	rawConfigs, err = patchConfigs(rawConfigs, environment)
+	rawConfig, err = patchConfig(rawConfig, environment)
 	if err != nil {
 		return nil, err
 	}
 	return &configStore{
-		rawConfigs: rawConfigs,
+		cache: rawConfig,
 	}, nil
 }
 
-func gatherConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
+func aggregateConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
 	pattern := filepath.Join(dirPath, "*.yaml")
 	filePaths, err := afero.Glob(fs, pattern)
 	if err != nil {
 		return nil, fmt.Errorf("find files; pattern=%q: %w", pattern, err)
 	}
-	rawConfigSet := make(map[string]json.RawMessage)
+	rawConfigs := make(map[string]json.RawMessage)
 	for _, filePath := range filePaths {
 		configName := strings.TrimSuffix(filepath.Base(filePath), ".yaml")
 		rawConfig, err := afero.ReadFile(fs, filePath)
@@ -95,16 +95,16 @@ func gatherConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
 		if err != nil {
 			return nil, fmt.Errorf("convert yaml to json; filePath=%q: %w", filePath, err)
 		}
-		rawConfigSet[configName] = rawConfig
+		rawConfigs[configName] = rawConfig
 	}
-	rawConfigs, err := json.Marshal(rawConfigSet)
+	rawConfig, err := json.Marshal(rawConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("marshal to json: %w", err)
 	}
-	return rawConfigs, nil
+	return rawConfig, nil
 }
 
-func patchConfigs(rawConfigs json.RawMessage, environment []string) (json.RawMessage, error) {
+func patchConfig(rawConfig json.RawMessage, environment []string) (json.RawMessage, error) {
 	kvs := extractKVsFromEnvironment(environment)
 	for _, kv := range kvs {
 		key, value := kv[0], kv[1]
@@ -113,7 +113,7 @@ func patchConfigs(rawConfigs json.RawMessage, environment []string) (json.RawMes
 			return nil, fmt.Errorf("convert yaml to json; key=%q value=%q: %w", key, value, err)
 		}
 		path := key[len(keyPrefix):]
-		rawConfigs, err = sjson.SetRawBytesOptions(rawConfigs, path, data, &sjson.Options{
+		rawConfig, err = sjson.SetRawBytesOptions(rawConfig, path, data, &sjson.Options{
 			Optimistic:     true,
 			ReplaceInPlace: true,
 		})
@@ -121,7 +121,7 @@ func patchConfigs(rawConfigs json.RawMessage, environment []string) (json.RawMes
 			return nil, fmt.Errorf("set json value; path=%q: %w", path, err)
 		}
 	}
-	return rawConfigs, nil
+	return rawConfig, nil
 }
 
 const keyPrefix = "CONFIGSTORE."
@@ -142,14 +142,8 @@ func extractKVsFromEnvironment(environment []string) [][2]string {
 	return kvs
 }
 
-func (cs *configStore) Dump() string {
-	var buffer bytes.Buffer
-	json.Indent(&buffer, cs.rawConfigs, "", "  ")
-	return buffer.String()
-}
-
 func (cs *configStore) LoadItem(path string, item interface{}) error {
-	value := gjson.GetBytes(cs.rawConfigs, path).Raw
+	value := gjson.GetBytes(cs.cache, path).Raw
 	if value == "" {
 		return fmt.Errorf("%w; path=%q", ErrValueNotFound, path)
 	}
@@ -158,6 +152,8 @@ func (cs *configStore) LoadItem(path string, item interface{}) error {
 	}
 	return nil
 }
+
+func (cs *configStore) Cache() json.RawMessage { return cs.cache }
 
 // ErrValueNotFound is returned when the JSON value does not exist.
 var ErrValueNotFound = errors.New("configstore: value not found")

@@ -1,6 +1,8 @@
 package configstore_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -52,7 +54,9 @@ func TestOpenConfigStore(t *testing.T) {
 		}).
 		Step(3, func(t *testing.T, w *Workspace) {
 			if w.CS != nil {
-				w.ActSt.JSON = w.CS.Dump()
+				var b bytes.Buffer
+				json.Indent(&b, w.CS.Cache(), "", "  ")
+				w.ActSt.JSON = b.String()
 			}
 			assert.Equal(t, w.ExpSt, w.ActSt)
 		})

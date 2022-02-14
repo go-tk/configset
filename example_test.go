@@ -1,6 +1,7 @@
 package configstore_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,7 +27,7 @@ secrets:
     - 5
 `), 0644)
 
-	// 2. Override configuration values via environment variables.
+	// 2. Override configuration values with environment variables.
 	os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value should be valid YAML
 	os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
@@ -34,9 +35,9 @@ secrets:
 	configstore.MustOpen("./temp")
 
 	// 4. Dump the whole configuration in form of JSON for debugging.
-	json := configstore.Dump()
-	fmt.Println("===== Dump =====")
-	fmt.Println(json)
+	data, _ := json.MarshalIndent(configstore.Cache(), "", "  ")
+	fmt.Println("===== Cache =====")
+	fmt.Printf("%s\n", data)
 
 	// 5. Load a configuration item by a path.
 	var secrets struct {
@@ -48,7 +49,7 @@ secrets:
 	fmt.Printf("%v\n", secrets)
 
 	// output:
-	// ===== Dump =====
+	// ===== Cache =====
 	// {
 	//   "bar": {
 	//     "secrets": {

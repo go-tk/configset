@@ -43,7 +43,7 @@ secrets:
     - 5
 `), 0644)
 
-        // 2. Override configuration values via environment variables.
+        // 2. Override configuration values with environment variables.
         os.Setenv("CONFIGSTORE.foo.nickname", "lisa")             // env value should be valid YAML
         os.Setenv("CONFIGSTORE.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
@@ -51,8 +51,8 @@ secrets:
         configstore.MustOpen("./temp")
 
         // 4. Dump the whole configuration in form of JSON for debugging.
-        json := configstore.Dump()
-        fmt.Println(json)
+        data, _ := json.MarshalIndent(configstore.Cache(), "", "  ")
+        fmt.Printf("%s\n", data)
         // output:
         // {
         //   "bar": {
@@ -77,6 +77,7 @@ secrets:
                 LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
         }
         configstore.MustLoadItem("bar.secrets", &secrets)
+        fmt.Println("===== MustLoadItem  =====")
         fmt.Printf("%v\n", secrets)
         // output:
         // {s0g00d [1 99 5]}
