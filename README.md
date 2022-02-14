@@ -77,7 +77,6 @@ secrets:
                 LuckNumbers []int  `json:"luck_numbers"` // should use json tag rather than yaml tag
         }
         configstore.MustLoadItem("bar.secrets", &secrets)
-        fmt.Println("===== MustLoadItem  =====")
         fmt.Printf("%v\n", secrets)
         // output:
         // {s0g00d [1 99 5]}
