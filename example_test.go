@@ -15,6 +15,7 @@ func Example() {
 	ioutil.WriteFile("./temp/foo.yaml", []byte(`
 user_id: 1000
 nickname: roy
+friends: [dave]
 `), 0644)
 
 	ioutil.WriteFile("./temp/bar.yaml", []byte(`
@@ -28,6 +29,7 @@ secrets:
 
 	// 2. Override configuration values with environment variables.
 	os.Setenv("CONFIGSET.foo.nickname", "lisa")             // env value should be valid YAML
+	os.Setenv("CONFIGSET.foo.friends", "[maria, victoria]") // env value should be valid YAML
 	os.Setenv("CONFIGSET.bar.secrets.luck_numbers.1", "99") // env value should be valid YAML
 
 	// 3. Read in configuration files.
@@ -61,6 +63,10 @@ secrets:
 	//     }
 	//   },
 	//   "foo": {
+	//     "friends": [
+	//       "maria",
+	//       "victoria"
+	//     ],
 	//     "nickname": "lisa",
 	//     "user_id": 1000
 	//   }
