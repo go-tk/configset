@@ -8,7 +8,7 @@ Simple & powerful configuration library
 
 ## Features
 
-- Load all configuration files under a directory at once.
+- Aggregate all configuration files under a directory into one.
 
 - Use environment variables to override configuration values.
 
