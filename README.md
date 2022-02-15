@@ -15,7 +15,17 @@ Simple & powerful configuration library
 ## Example
 
 ```go
-func Example() {
+package main
+
+import (
+        "fmt"
+        "io/ioutil"
+        "os"
+
+        "github.com/go-tk/configset"
+)
+
+func main() {
         // 1. Create configuration files for testing.
         _ = os.Mkdir("./temp", 0755)
 
