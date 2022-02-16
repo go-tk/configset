@@ -8,7 +8,7 @@ Simple & powerful configuration library
 
 ## Features
 
-- Aggregate all configuration files under a directory into one.
+- Aggregate all configuration files under a directory into one configuration.
 
 - Use environment variables to override configuration values.
 

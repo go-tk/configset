@@ -38,7 +38,7 @@ func MustLoad(dirPath string) {
 	}
 }
 
-// ReadValue finds the value for the given path from the config se and
+// ReadValue finds the value for the given path from the config set and
 // unmarshals the given config from that value in form of JSON.
 // If no value can be found by the path, ErrValueNotFound is returned.
 func ReadValue(path string, config interface{}) error { return cs.ReadValue(path, config) }
