@@ -98,9 +98,10 @@ author: roy
 					"FOO=BAR",
 					"CONFIGSET.aaa.hello=\"hi\"",
 					"CONFIGSET.aaa.numbers.1=-2",
+					"CONFIGSET.gogo.version.y=22",
 					`CONFIGSET.gogo.version={"x": 1, "y": 2, "z": 3}`,
 				}
-				w.ExpSt.JSON = `{"aaa":{"hello":"hi","numbers":[1,-2,3]},"gogo":{"author":"roy","version":{"x":1,"y":2,"z":3}}}`
+				w.ExpSt.JSON = `{"aaa":{"hello":"hi","numbers":[1,-2,3]},"gogo":{"author":"roy","version":{"x":1,"y":22,"z":3}}}`
 			}),
 		tc.Copy().
 			Given("directory with bad configuration files").

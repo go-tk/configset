@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/afero"
@@ -58,7 +59,7 @@ type configSet struct {
 }
 
 func (cs *configSet) Load(fs afero.Fs, dirPath string, environment []string) error {
-	raw, err := gatherConfigs(fs, dirPath)
+	raw, err := aggregateConfigs(fs, dirPath)
 	if err != nil {
 		return err
 	}
@@ -70,7 +71,7 @@ func (cs *configSet) Load(fs afero.Fs, dirPath string, environment []string) err
 	return nil
 }
 
-func gatherConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
+func aggregateConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
 	pattern := filepath.Join(dirPath, "*.yaml")
 	filePaths, err := afero.Glob(fs, pattern)
 	if err != nil {
@@ -131,6 +132,9 @@ func extractKVs(environment []string) [][2]string {
 		kv := [2]string{rawKV[:i], rawKV[i+1:]}
 		kvs = append(kvs, kv)
 	}
+	sort.Slice(kvs, func(i, j int) bool {
+		return kvs[i][0] < kvs[j][0]
+	})
 	return kvs
 }
 
