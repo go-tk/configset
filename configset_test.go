@@ -315,18 +315,18 @@ bar: "
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
-	ff := *configset.FsFactory
-	*configset.FsFactory = func() afero.Fs { return fs }
-	defer func() { *configset.FsFactory = ff }()
+	fn := *configset.NewFs
+	*configset.NewFs = func() afero.Fs { return fs }
+	defer func() { *configset.NewFs = fn }()
 	assert.PanicsWithValue(t, "load config set: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
 		configset.MustLoad("/my_etc")
 	})
 }
 
 func TestMustReadValue(t *testing.T) {
-	ef := *configset.EnvironmentFactory
-	*configset.EnvironmentFactory = func() []string { return []string{"CONFIGSET.foo.bar=100"} }
-	defer func() { *configset.EnvironmentFactory = ef }()
+	fn := *configset.GetEnvironment
+	*configset.GetEnvironment = func() []string { return []string{"CONFIGSET.foo.bar=100"} }
+	defer func() { *configset.GetEnvironment = fn }()
 	assert.PanicsWithValue(t, "read value: unmarshal from json; path=\"foo.bar\" configType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
 		configset.MustLoad("/my_etc")
 		var s string

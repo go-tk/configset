@@ -1,8 +1,8 @@
 package configset
 
 var (
-	FsFactory          = &fsFactory
-	EnvironmentFactory = &environmentFactory
+	NewFs          = &newFs
+	GetEnvironment = &getEnvironment
 )
 
 type ConfigSet = configSet
