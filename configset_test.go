@@ -57,10 +57,13 @@ func TestLoadConfigSet(t *testing.T) {
 		})
 	testcase.RunListParallel(t,
 		tc.Copy().
-			Given("directory without good configuration files").
+			Given("directory without configuration files").
 			Then("should succeed").
 			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 0755)
+				w.In.MemMapFs.Mkdir("/my_etc/test", 0755)
+				afero.WriteFile(w.In.MemMapFs, "/my_etc/hello.txt", []byte(`
+你好
+`), 0644)
 				w.In.DirPath = "/my_etc"
 				w.ExpSt.JSON = "{}"
 			}),
@@ -102,6 +105,13 @@ author: roy
 					`CONFIGSET.gogo.version={"x": 1, "y": 2, "z": 3}`,
 				}
 				w.ExpSt.JSON = `{"aaa":{"hello":"hi","numbers":[1,-2,3]},"gogo":{"author":"roy","version":{"x":1,"y":22,"z":3}}}`
+			}),
+		tc.Copy().
+			Given("directory not found").
+			Then("should fail").
+			Step(.5, func(t *testing.T, w *Workspace) {
+				w.In.DirPath = "/my_etc"
+				w.ExpOut.ErrStr = "read dir; dirPath=\"/my_etc\": open /my_etc: file does not exist"
 			}),
 		tc.Copy().
 			Given("directory with bad configuration files").
@@ -308,25 +318,43 @@ my_numbers: [1,2,3]
 
 func TestMustLoad(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	_ = fs.Mkdir("/my_etc", 0755)
-	err := afero.WriteFile(fs, "/my_etc/foo.yaml", []byte(`
+	err := fs.Mkdir("/my_etc", 0755)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	err = afero.WriteFile(fs, "/my_etc/foo.yaml", []byte(`
 bar: "
 `), 0644)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
-	fn := *configset.NewFs
-	*configset.NewFs = func() afero.Fs { return fs }
-	defer func() { *configset.NewFs = fn }()
+	{
+		fn := *configset.NewFs
+		*configset.NewFs = func() afero.Fs { return fs }
+		defer func() { *configset.NewFs = fn }()
+	}
 	assert.PanicsWithValue(t, "load config set: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
 		configset.MustLoad("/my_etc")
 	})
 }
 
 func TestMustReadValue(t *testing.T) {
-	fn := *configset.GetEnvironment
-	*configset.GetEnvironment = func() []string { return []string{"CONFIGSET.foo.bar=100"} }
-	defer func() { *configset.GetEnvironment = fn }()
+	fs := afero.NewMemMapFs()
+	err := fs.Mkdir("/my_etc", 0755)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	err = afero.WriteFile(fs, "/my_etc/foo.yaml", []byte(`
+bar: 100
+`), 0644)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	{
+		fn := *configset.NewFs
+		*configset.NewFs = func() afero.Fs { return fs }
+		defer func() { *configset.NewFs = fn }()
+	}
 	assert.PanicsWithValue(t, "read value: unmarshal from json; path=\"foo.bar\" configType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
 		configset.MustLoad("/my_etc")
 		var s string

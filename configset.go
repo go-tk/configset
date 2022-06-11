@@ -71,14 +71,21 @@ func (cs *configSet) Load(fs afero.Fs, dirPath string, environment []string) err
 }
 
 func aggregateConfigs(fs afero.Fs, dirPath string) (json.RawMessage, error) {
-	pattern := filepath.Join(dirPath, "*.yaml")
-	filePaths, err := afero.Glob(fs, pattern)
+	fileInfoSet, err := afero.ReadDir(fs, dirPath)
 	if err != nil {
-		return nil, fmt.Errorf("find files; pattern=%q: %w", pattern, err)
+		return nil, fmt.Errorf("read dir; dirPath=%q: %w", dirPath, err)
 	}
 	rawConfigs := make(map[string]json.RawMessage)
-	for _, filePath := range filePaths {
-		configName := strings.TrimSuffix(filepath.Base(filePath), ".yaml")
+	for _, fileInfo := range fileInfoSet {
+		if fileInfo.IsDir() {
+			continue
+		}
+		fileName := fileInfo.Name()
+		configName := strings.TrimSuffix(fileName, ".yaml")
+		if len(configName) == len(fileName) {
+			continue
+		}
+		filePath := filepath.Join(dirPath, fileName)
 		rawConfig, err := afero.ReadFile(fs, filePath)
 		if err != nil {
 			return nil, fmt.Errorf("read file; filePath=%q: %w", filePath, err)
