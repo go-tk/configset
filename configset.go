@@ -21,15 +21,7 @@ var cs configSet
 // Load loads the config set from all *.yaml files under the given directory.
 // If there are environment variables set such as CONFIGSET.{path}={value},
 // the config set will be overwritten according to {paths} and {values}.
-func Load(dirPath string) error {
-	fs := newFs()
-	environment := getEnvironment()
-	return cs.Load(fs, dirPath, environment)
-}
-
-var newFs = func() afero.Fs { return afero.NewOsFs() }
-
-var getEnvironment = func() []string { return os.Environ() }
+func Load(dirPath string) error { return cs.Load(afero.NewOsFs(), dirPath, os.Environ()) }
 
 // MustLoad likes Load but panics when an error occurs.
 func MustLoad(dirPath string) {

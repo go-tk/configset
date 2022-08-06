@@ -1,363 +1,270 @@
 package configset_test
 
 import (
-	"errors"
+	"encoding/json"
+	"os"
 	"testing"
 
-	"github.com/go-tk/configset"
 	. "github.com/go-tk/configset"
 	"github.com/go-tk/testcase"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLoadConfigSet(t *testing.T) {
-	type Workspace struct {
-		CS ConfigSet
-		In struct {
-			MemMapFs    *afero.MemMapFs
-			DirPath     string
-			Environment []string
-		}
-		ExpOut, ActOut struct {
-			ErrStr string
-			Err    error
-		}
-		ExpSt, ActSt struct {
-			JSON string
-		}
+func TestConfigSet_Load(t *testing.T) {
+	type C struct {
+		fs             *afero.MemMapFs
+		dirPath        string
+		environment    []string
+		expectedJSON   string
+		expectedErrStr string
+		expectedErr    error
 	}
-	tc := testcase.New().
-		Step(0, func(t *testing.T, w *Workspace) {
-			w.In.MemMapFs = afero.NewMemMapFs().(*afero.MemMapFs)
-		}).
-		Step(1, func(t *testing.T, w *Workspace) {
-			err := w.CS.Load(w.In.MemMapFs, w.In.DirPath, w.In.Environment)
-			if err != nil {
-				w.ActOut.ErrStr = err.Error()
-				w.ActOut.Err = err
+	tc := testcase.New(func(t *testing.T, c *C) {
+		t.Parallel()
+
+		var cs ConfigSet
+		fs := afero.NewMemMapFs().(*afero.MemMapFs)
+		c.fs = fs
+
+		testcase.DoCallback(0, t, c)
+
+		err := cs.Load(fs, c.dirPath, c.environment)
+		if c.expectedErrStr != "" {
+			assert.EqualError(t, err, c.expectedErrStr)
+			if c.expectedErr != nil {
+				assert.ErrorIs(t, err, c.expectedErr)
 			}
-		}).
-		Step(2, func(t *testing.T, w *Workspace) {
-			if w.ExpOut.Err == nil {
-				w.ActOut.Err = nil
-			} else {
-				if errors.Is(w.ActOut.Err, w.ExpOut.Err) {
-					w.ActOut.Err = nil
-					w.ExpOut.Err = nil
-				}
+			return
+		}
+		assert.NoError(t, err)
+		json := string(cs.Dump("", ""))
+		assert.Equal(t, c.expectedJSON, json)
+	})
+
+	var (
+		snippet1 = func(t *testing.T, c *C) {
+			if err := c.fs.Mkdir("/my_etc/test", 0755); err != nil {
+				t.Fatal(err)
 			}
-			assert.Equal(t, w.ExpOut, w.ActOut)
-		}).
-		Step(3, func(t *testing.T, w *Workspace) {
-			if w.CS.IsLoaded() {
-				w.ActSt.JSON = string(w.CS.Dump("", ""))
-			}
-			assert.Equal(t, w.ExpSt, w.ActSt)
-		})
-	testcase.RunListParallel(t,
-		tc.Copy().
-			Given("directory without configuration files").
-			Then("should succeed").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc/test", 0755)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/hello.txt", []byte(`
-你好
-`), 0644)
-				w.In.DirPath = "/my_etc"
-				w.ExpSt.JSON = "{}"
-			}),
-		tc.Copy().
-			Given("directory with configuration files").
-			Then("should succeed").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
+			if err := afero.WriteFile(c.fs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 numbers: [1,2,3]
-`), 0644)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
+`), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if err := afero.WriteFile(c.fs, "/my_etc/test.txt", []byte(`
+just for fun!
+`), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if err := afero.WriteFile(c.fs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
 author: roy
-`), 0644)
-				w.In.DirPath = "/my_etc"
-				w.ExpSt.JSON = `{"aaa":{"hello":"world","numbers":[1,2,3]},"gogo":{"author":"roy","version":1}}`
-			}),
-		tc.Copy().
-			Given("environment with good overriding values").
-			Then("should succeed").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
-hello: world
-numbers: [1,2,3]
-`), 0644)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
-version: 1.0
-author: roy
-`), 0644)
-				w.In.DirPath = "/my_etc"
-				w.In.Environment = []string{
-					"FOO=BAR",
-					"CONFIGSET.aaa.hello=\"hi\"",
-					"CONFIGSET.aaa.numbers.1=-2",
-					"CONFIGSET.gogo.version.y=22",
-					`CONFIGSET.gogo.version={"x": 1, "y": 2, "z": 3}`,
-				}
-				w.ExpSt.JSON = `{"aaa":{"hello":"hi","numbers":[1,-2,3]},"gogo":{"author":"roy","version":{"x":1,"y":22,"z":3}}}`
-			}),
-		tc.Copy().
-			Given("directory not found").
-			Then("should fail").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.DirPath = "/my_etc"
-				w.ExpOut.ErrStr = "read dir; dirPath=\"/my_etc\": open /my_etc: file does not exist"
-			}),
-		tc.Copy().
-			Given("directory with bad configuration files").
-			Then("should fail").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
+`), 0644); err != nil {
+				t.Fatal(err)
+			}
+			c.dirPath = "/my_etc/"
+		}
+	)
+
+	// directory without configuration files
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			c.dirPath = "/"
+			c.expectedJSON = "{}"
+		}).
+		Run(t)
+
+	// directory with configuration files
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			snippet1(t, c)
+			c.expectedJSON = `{"aaa":{"hello":"world","numbers":[1,2,3]},"gogo":{"author":"roy","version":1}}`
+		}).
+		Run(t)
+
+	// environment with overriding values
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			snippet1(t, c)
+			c.environment = []string{
+				"FOO=BAR",
+				"CONFIGSET.aaa.hello=\"hi\"",
+				"CONFIGSET.aaa.numbers.1=-2",
+				"CONFIGSET.gogo.version.y=22",
+				`CONFIGSET.gogo.version={"x": 1, "y": 2, "z": 3}`,
+				"CONFIGSET.gogo",
+				"HELLO=WORLD",
+			}
+			c.expectedJSON = `{"aaa":{"hello":"hi","numbers":[1,-2,3]},"gogo":{"author":"roy","version":{"x":1,"y":22,"z":3}}}`
+		}).
+		Run(t)
+
+	// environment with bad configuration files
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			snippet1(t, c)
+			if err := afero.WriteFile(c.fs, "/my_etc/aaa.yaml", []byte(`
 hello: world
 numbers: [1,2,3
-`), 0644)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
-version: 1.0
-author: roy
-`), 0644)
-				w.In.DirPath = "/my_etc"
-				w.ExpOut.ErrStr = "convert yaml to json; filePath=\"/my_etc/aaa.yaml\": yaml: line 3: did not find expected ',' or ']'"
-			}),
-		tc.Copy().
-			Given("environment with bad overriding values (1)").
-			Then("should fail").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
-hello: world
-numbers: [1,2,3]
-`), 0644)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
-version: 1.0
-author: roy
-`), 0644)
-				w.In.DirPath = "/my_etc"
-				w.In.Environment = []string{
-					"CONFIGSET.aaa.hello='",
-				}
-				w.ExpOut.ErrStr = "convert yaml to json; key=\"CONFIGSET.aaa.hello\" value=\"'\": yaml: found unexpected end of stream"
-			}),
-		tc.Copy().
-			Given("environment with bad overriding values (2)").
-			Then("should fail").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.In.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/aaa.yaml", []byte(`
-hello: world
-numbers: [1,2,3]
-`), 0644)
-				afero.WriteFile(w.In.MemMapFs, "/my_etc/gogo.yaml", []byte(`
-version: 1.0
-author: roy
-`), 0644)
-				w.In.DirPath = "/my_etc"
-				w.In.Environment = []string{
-					"CONFIGSET.=1",
-				}
-				w.ExpOut.ErrStr = "set json value; path=\"\": path cannot be empty"
-			}),
-	)
+`), 0644); err != nil {
+				t.Fatal(err)
+			}
+			c.expectedErrStr = "convert yaml to json; filePath=\"/my_etc/aaa.yaml\": yaml: line 3: did not find expected ',' or ']'"
+		}).
+		Run(t)
+
+	// environment with overriding values (1)
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			snippet1(t, c)
+			c.environment = []string{
+				"CONFIGSET.aaa.hello='",
+			}
+			c.expectedErrStr = "convert yaml to json; key=\"CONFIGSET.aaa.hello\" value=\"'\": yaml: found unexpected end of stream"
+		}).
+		Run(t)
+
+	// environment with overriding values (2)
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			snippet1(t, c)
+			c.environment = []string{
+				"CONFIGSET.=1",
+			}
+			c.expectedErrStr = "set json value; path=\"\": path cannot be empty"
+		}).
+		Run(t)
+
+	// non-existent configuration directory
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			c.dirPath = "/helloworld"
+			c.expectedErrStr = `read dir; dirPath="/helloworld": open /helloworld: file does not exist`
+			c.expectedErr = os.ErrNotExist
+		}).
+		Run(t)
 }
 
 func TestConfigSet_ReadValue(t *testing.T) {
-	type Workspace struct {
-		CS   ConfigSet
-		Init struct {
-			MemMapFs    *afero.MemMapFs
-			DirPath     string
-			Environment []string
-		}
-		In struct {
-			Path   string
-			Config interface{}
-		}
-		ExpOut, ActOut struct {
-			Config interface{}
-			ErrStr string
-			Err    error
-		}
+	type C struct {
+		path           string
+		config         interface{}
+		expectedConfig interface{}
+		expectedErrStr string
+		expectedErr    error
+		expectedErrBuf interface{}
 	}
-	tc := testcase.New().
-		Step(0, func(t *testing.T, w *Workspace) {
-			w.Init.MemMapFs = afero.NewMemMapFs().(*afero.MemMapFs)
-		}).
-		Step(1, func(t *testing.T, w *Workspace) {
-			err := w.CS.Load(w.Init.MemMapFs, w.Init.DirPath, w.Init.Environment)
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
-		}).
-		Step(2, func(t *testing.T, w *Workspace) {
-			err := w.CS.ReadValue(w.In.Path, w.In.Config)
-			if err == nil {
-				w.ActOut.Config = w.In.Config
-			} else {
-				w.ActOut.ErrStr = err.Error()
-				w.ActOut.Err = err
-			}
-		}).
-		Step(3, func(t *testing.T, w *Workspace) {
-			if w.ExpOut.Err == nil {
-				w.ActOut.Err = nil
-			} else {
-				if errors.Is(w.ActOut.Err, w.ExpOut.Err) {
-					w.ActOut.Err = nil
-					w.ExpOut.Err = nil
-				}
-			}
-			assert.Equal(t, w.ExpOut, w.ActOut)
-		})
-	testcase.RunListParallel(t,
-		tc.Copy().
-			Then("should succeed").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
+	tc := testcase.New(func(t *testing.T, c *C) {
+		t.Parallel()
+
+		var cs ConfigSet
+		fs := afero.NewMemMapFs().(*afero.MemMapFs)
+		if err := fs.Mkdir("/my_etc/test", 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := afero.WriteFile(fs, "/my_etc/aaa.yaml", []byte(`
 hello: world
-my_numbers: [1,2,3]
-`), 0644)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/gogo.yaml", []byte(`
+numbers: [1,2,3]
+`), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := afero.WriteFile(fs, "/my_etc/gogo.yaml", []byte(`
 version: 1.0
-author: roy
-`), 0644)
-				w.Init.DirPath = "/my_etc"
-				w.Init.Environment = []string{
-					"CONFIGSET.aaa.my_numbers.1=-2",
-				}
-			}).
-			Step(1.5, func(t *testing.T, w *Workspace) {
-				type AAA struct {
-					Hello     string `json:"hello"`
-					MyNumbers []int  `json:"my_numbers"`
-				}
-				w.In.Path = "aaa"
-				w.In.Config = &AAA{}
-				w.ExpOut.Config = &AAA{
-					Hello:     "world",
-					MyNumbers: []int{1, -2, 3},
-				}
-			}),
-		tc.Copy().
-			Then("should succeed").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
-hello: world
-my_numbers: [1,2,3]
-`), 0644)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/gogo.yaml", []byte(`
-version: [1,2,3]
-author: roy
-`), 0644)
-				w.Init.DirPath = "/my_etc"
-			}).
-			Step(1.5, func(t *testing.T, w *Workspace) {
-				var my_numbers []int
-				w.In.Path = "gogo.version"
-				w.In.Config = &my_numbers
-				w.ExpOut.Config = &[]int{1, 2, 3}
-			}),
-		tc.Copy().
-			Given("unexpected value").
-			Then("should fail").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
-hello: world
-my_numbers: [1,2,3]
-`), 0644)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/gogo.yaml", []byte(`
-version: 1
-author: 1
-`), 0644)
-				w.Init.DirPath = "/my_etc"
-			}).
-			Step(1.5, func(t *testing.T, w *Workspace) {
-				type GoGo struct {
-					Version int    `json:"version"`
-					Author  string `json:"author"`
-				}
-				w.In.Path = "gogo"
-				w.In.Config = &GoGo{}
-				w.ExpOut.ErrStr = "unmarshal from json; path=\"gogo\" configType=\"*configset_test.GoGo\": json: cannot unmarshal number into Go struct field GoGo.author of type string"
-			}),
-		tc.Copy().
-			Given("no value corresponding to path").
-			Then("should fail").
-			Step(.5, func(t *testing.T, w *Workspace) {
-				w.Init.MemMapFs.Mkdir("/my_etc", 0755)
-				afero.WriteFile(w.Init.MemMapFs, "/my_etc/aaa.yaml", []byte(`
-hello: world
-my_numbers: [1,2,3]
-`), 0644)
-				w.Init.DirPath = "/my_etc"
-			}).
-			Step(1.5, func(t *testing.T, w *Workspace) {
-				type GoGo struct {
-					Version int    `json:"version"`
-					Author  string `json:"author"`
-				}
-				w.In.Path = "gogo"
-				w.In.Config = &GoGo{}
-				w.ExpOut.ErrStr = "configset: value not found; path=\"gogo\""
-				w.ExpOut.Err = ErrValueNotFound
-			}),
-	)
-}
+author:
+  name: roy
+  gender: male
+`), 0644); err != nil {
+			t.Fatal(err)
+		}
+		err := cs.Load(fs, "/my_etc/", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-func TestMustLoad(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	err := fs.Mkdir("/my_etc", 0755)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	err = afero.WriteFile(fs, "/my_etc/foo.yaml", []byte(`
-bar: "
-`), 0644)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	{
-		fn := *configset.NewFs
-		*configset.NewFs = func() afero.Fs { return fs }
-		defer func() { *configset.NewFs = fn }()
-	}
-	assert.PanicsWithValue(t, "load config set: convert yaml to json; filePath=\"/my_etc/foo.yaml\": yaml: line 3: found unexpected end of stream", func() {
-		configset.MustLoad("/my_etc")
-	})
-}
+		testcase.DoCallback(0, t, c)
 
-func TestMustReadValue(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	err := fs.Mkdir("/my_etc", 0755)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	err = afero.WriteFile(fs, "/my_etc/foo.yaml", []byte(`
-bar: 100
-`), 0644)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	{
-		fn := *configset.NewFs
-		*configset.NewFs = func() afero.Fs { return fs }
-		defer func() { *configset.NewFs = fn }()
-	}
-	assert.PanicsWithValue(t, "read value: unmarshal from json; path=\"foo.bar\" configType=\"*string\": json: cannot unmarshal number into Go value of type string", func() {
-		configset.MustLoad("/my_etc")
-		var s string
-		configset.MustReadValue("foo.bar", &s)
+		err = cs.ReadValue(c.path, c.config)
+		if c.expectedErrStr != "" {
+			assert.EqualError(t, err, c.expectedErrStr)
+			if c.expectedErr != nil {
+				assert.ErrorIs(t, err, c.expectedErr)
+			}
+			if c.expectedErrBuf != nil {
+				assert.ErrorAs(t, err, c.expectedErrBuf)
+			}
+			return
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, c.expectedConfig, c.config)
 	})
+
+	// read 1st level value
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			type AAA struct {
+				Hello   string `json:"hello"`
+				Numbers []int  `json:"numbers"`
+			}
+			c.path = "aaa"
+			c.config = &AAA{}
+			c.expectedConfig = &AAA{
+				Hello:   "world",
+				Numbers: []int{1, 2, 3},
+			}
+		}).
+		Run(t)
+
+	// read 2nd level value (1)
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			c.path = "aaa.numbers"
+			c.config = &[]int{}
+			c.expectedConfig = &[]int{1, 2, 3}
+		}).
+		Run(t)
+
+	// read 2nd level value (2)
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			type Author struct {
+				Name   string `json:"name"`
+				Gender string `json:"gender"`
+			}
+			c.path = "gogo.author"
+			c.config = &Author{}
+			c.expectedConfig = &Author{
+				Name:   "roy",
+				Gender: "male",
+			}
+		}).
+		Run(t)
+
+	// read non-existent value
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			type Author struct {
+				Name   string `json:"name"`
+				Gender string `json:"gender"`
+			}
+			c.path = "gogo.author.age"
+			c.expectedErrStr = "configset: value not found; path=\"gogo.author.age\""
+			c.expectedErr = ErrValueNotFound
+		}).
+		Run(t)
+
+	// json unmarshal error
+	tc.Copy().
+		SetCallback(0, func(t *testing.T, c *C) {
+			type Author struct {
+				Name   string `json:"name"`
+				Gender int    `json:"gender"`
+			}
+			c.path = "gogo.author"
+			c.config = &Author{}
+			c.expectedErrStr = `unmarshal from json; path="gogo.author" configType="*configset_test.Author": json: cannot unmarshal string into Go struct field Author.gender of type int`
+			c.expectedErrBuf = new(*json.UnmarshalTypeError)
+		}).
+		Run(t)
 }
